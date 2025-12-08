@@ -1,1 +1,1 @@
-A responsive Spotify clone built with HTML, CSS, and JavaScript. Features dynamic song loading, custom audio controls, playlist navigation, and an intuitive UI inspired by Spotify’s design. Optimized for smooth performance across devices and structured for easy expansion and future enhancements.
+
