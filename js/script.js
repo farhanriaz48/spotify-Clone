@@ -2,6 +2,22 @@ console.log('Lets write JavaScript');
 let currentSong = new Audio();
 let songs;
 let currFolder;
+// List of album folders available in the songs directory.
+// Using an explicit list avoids relying on server-side directory listings,
+// which often don't work in simple local setups.
+const albumFolders = [
+    "Angry_(mood)",
+    "Bright_(mood)",
+    "Chill_(mood)",
+    "cs",
+    "Dark_(mood)",
+    "Diljit",
+    "Funky_(mood)",
+    "karan aujla",
+    "Love_(mood)",
+    "ncs",
+    "Uplifting_(mood)",
+];
 
 function secondsToMinutesSeconds(seconds) {
     if (isNaN(seconds) || seconds < 0) {
@@ -19,7 +35,8 @@ function secondsToMinutesSeconds(seconds) {
 
 async function getSongs(folder) {
     currFolder = folder;
-    let a = await fetch(`/${folder}/`)
+    // Use a relative/encoded path so it works in most environments
+    let a = await fetch(encodeURI(`${folder}/`))
     let response = await a.text();
     let div = document.createElement("div")
     div.innerHTML = response;
@@ -28,7 +45,10 @@ async function getSongs(folder) {
     for (let index = 0; index < as.length; index++) {
         const element = as[index];
         if (element.href.endsWith(".mp3")) {
-            songs.push(element.href.split(`/${folder}/`)[1])
+            // Always take just the file name part of the URL
+            const parts = element.href.split("/");
+            const fileName = decodeURIComponent(parts[parts.length - 1]);
+            songs.push(fileName);
         }
     }
  
@@ -61,10 +81,12 @@ async function getSongs(folder) {
 }
 
 const playMusic = (track, pause = false) => {
-    currentSong.src = `/${currFolder}/` + track
+    // Use relative URL for the audio source as well
+    currentSong.src = `${encodeURI(currFolder)}/` + encodeURIComponent(track)
+    const playButton = document.getElementById("play");
     if (!pause) {
         currentSong.play()
-        play.src = "img/pause.svg"
+        if (playButton) playButton.src = "img/pause.svg"
     }
     document.querySelector(".songinfo").innerHTML = decodeURI(track)
     document.querySelector(".songtime").innerHTML = "00:00 / 00:00"
@@ -74,20 +96,22 @@ const playMusic = (track, pause = false) => {
 
 async function displayAlbums() {
     console.log("displaying albums")
-    let a = await fetch(`/songs/`)
-    let response = await a.text();
-    let div = document.createElement("div")
-    div.innerHTML = response;
-    let anchors = div.getElementsByTagName("a")
     let cardContainer = document.querySelector(".cardContainer")
-    let array = Array.from(anchors)
-    for (let index = 0; index < array.length; index++) {
-        const e = array[index]; 
-        if (e.href.includes("/songs") && !e.href.includes(".htaccess")) {
-            let folder = e.href.split("/").slice(-2)[0]
-            // Get the metadata of the folder
-            let a = await fetch(`/songs/${folder}/info.json`)
-            let response = await a.json(); 
+    cardContainer.innerHTML = "";
+
+    // Build cards from the known album folders and their info.json metadata
+    for (const folder of albumFolders) {
+        try {
+            const encodedFolder = encodeURIComponent(folder);
+            const infoPath = `songs/${encodedFolder}/info.json`;
+            const coverPath = `songs/${encodedFolder}/cover.jpg`;
+
+            let a = await fetch(infoPath)
+            if (!a.ok) {
+                console.error("Failed to load album info for", folder, a.status);
+                continue;
+            }
+            let response = await a.json();
             cardContainer.innerHTML = cardContainer.innerHTML + ` <div data-folder="${folder}" class="card">
             <div class="play">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -96,10 +120,12 @@ async function displayAlbums() {
                         stroke-linejoin="round" />
                 </svg>
             </div>
-            <img src="/songs/${folder}/cover.jpg" alt="image">
+            <img src="${coverPath}" alt="image">
             <h2>${response.title}</h2>
             <p>${response.description}</p>
         </div>`
+        } catch (err) {
+            console.error("Error while building album card for", folder, err);
         }
     }
 
@@ -115,6 +141,11 @@ async function displayAlbums() {
 }
 
 async function main() {
+    // Get DOM elements for play controls
+    const play = document.getElementById("play");
+    const previous = document.getElementById("previous");
+    const next = document.getElementById("next");
+
     // Get the list of all the songs
     await getSongs("songs/ncs")
     playMusic(songs[0], true)
